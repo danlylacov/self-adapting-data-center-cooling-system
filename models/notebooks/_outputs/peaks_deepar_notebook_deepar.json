@@ -1,0 +1,8 @@
+{
+  "peak_value": 21.03887939453125,
+  "peak_time": "2019-05-29 21:00:00",
+  "peak_idx": 21,
+  "horizon_hours": 48,
+  "model_type": "deepar",
+  "run_id": "notebook_deepar"
+}

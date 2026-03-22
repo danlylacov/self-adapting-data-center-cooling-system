@@ -1,0 +1,8 @@
+{
+  "peak_value": 21.46489967327105,
+  "peak_time": "2019-05-30 18:00:00",
+  "peak_idx": 42,
+  "horizon_hours": 48,
+  "model_type": "prophet",
+  "run_id": "notebook_prophet"
+}

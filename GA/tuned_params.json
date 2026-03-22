@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "genes": {
+    "target_chip_c": 61.83938395788167,
+    "kp": 0.0758774885469736,
+    "fan_base": 35.0,
+    "k_fan": 3.604999803382185,
+    "max_delta_sp": 2.0237044956758594
+  },
+  "fitness_best": 658306.9815618703,
+  "fitness_by_generation": [
+    665347.4401732979,
+    665347.4401732979,
+    665347.4401732979,
+    664516.6898577187,
+    663922.168566771,
+    663922.168566771,
+    663922.168566771,
+    663922.168566771,
+    663922.168566771,
+    662505.8549337294,
+    658625.3821690952,
+    658306.9815618703,
+    658306.9815618703,
+    658306.9815618703,
+    658306.9815618703,
+    658306.9815618703,
+    658306.9815618703,
+    658306.9815618703
+  ],
+  "training": {
+    "episode": {
+      "n_steps": 120,
+      "delta_time": 10.0,
+      "control_interval_steps": 5,
+      "seed": 42,
+      "setpoint0": 22.0,
+      "fan0": 65.0,
+      "cooling_mode": "mixed",
+      "mean_load": 0.55,
+      "std_load": 0.12,
+      "outside_temp": 28.0
+    },
+    "chip_temp_limit_c": 72.0,
+    "temp_penalty_weight": 500.0,
+    "rng_seed": 123
+  },
+  "extra": {
+    "cli": {
+      "twin_base": "http://127.0.0.1:8000",
+      "out": "/home/daniil/Рабочий стол/bonch/v2/GA/tuned_params.json",
+      "population": 14,
+      "generations": 18,
+      "seed": 42,
+      "rng_seed": 123,
+      "n_steps": 120,
+      "delta_time": 10.0,
+      "control_interval": 5,
+      "outside_temp": 28.0
+    }
+  }
+}

@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+numpy
+pandas
+lightning
+pytorch-forecasting
+prophet
+holidays

@@ -1,0 +1,376 @@
+:root {
+  color: #e7ecff;
+  background-color: #0d1421;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at 10% 10%, #1f2f4f, #0d1421 40%);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.globalNav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  row-gap: 10px;
+  padding: 10px 16px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  background: rgba(16, 25, 42, 0.95);
+  border-bottom: 1px solid #2f4468;
+  font-size: 14px;
+}
+
+.globalNav a {
+  color: #9ec5ff;
+  text-decoration: none;
+}
+
+.globalNav a:hover {
+  text-decoration: underline;
+}
+
+.navSep {
+  opacity: 0.4;
+}
+
+.topnav .navLink {
+  color: #9ec5ff;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.topnav .navLink:hover {
+  text-decoration: underline;
+}
+
+.layout {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: clamp(1.1rem, 4vw, 1.75rem);
+  line-height: 1.25;
+  word-wrap: break-word;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.status {
+  display: flex;
+  gap: 12px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.card {
+  background: rgba(22, 34, 56, 0.9);
+  border: 1px solid #2f4468;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.card p {
+  margin: 6px 0 0;
+  font-size: 18px;
+}
+
+.rackPanel,
+.quickPanel,
+.chartCard {
+  background: rgba(16, 25, 42, 0.92);
+  border: 1px solid #2f4468;
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 0;
+}
+
+.quickPanel {
+  margin-bottom: 12px;
+}
+
+.rackGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(120px, 100%), 1fr));
+  gap: 8px;
+  max-height: 760px;
+  overflow: auto;
+  min-width: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.serverCard {
+  display: grid;
+  gap: 2px;
+  border: 2px solid #3dff9e;
+  border-radius: 8px;
+  padding: 6px;
+  background: rgba(28, 43, 68, 0.95);
+  font-size: 12px;
+}
+
+.controlGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.labelRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.helpHint {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  outline: none;
+}
+
+.helpHintMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 50%;
+  background: #2a4a7a;
+  color: #cfe0ff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: help;
+  line-height: 1;
+  user-select: none;
+}
+
+.helpHint:hover .helpHintTooltip,
+.helpHint:focus .helpHintTooltip,
+.helpHint:focus-within .helpHintTooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+.helpHintTooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  background: #1a2a47;
+  border: 1px solid #4a6a9a;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #e7ecff;
+  width: max-content;
+  max-width: min(340px, 88vw);
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  line-height: 1.35;
+}
+
+input,
+select,
+textarea,
+button {
+  border-radius: 8px;
+  border: 1px solid #2f4468;
+  background: #12203a;
+  color: #e7ecff;
+  padding: 7px 8px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.jsonArea {
+  resize: vertical;
+  width: 100%;
+  min-height: 200px;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.charts {
+  margin-top: 12px;
+}
+
+.chartGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.chartCard .recharts-responsive-container {
+  min-width: 0 !important;
+}
+
+.progressWrap {
+  margin-top: 10px;
+}
+
+.progressInfo {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.progressBar {
+  height: 10px;
+  border-radius: 999px;
+  background: #1a2a47;
+  overflow: hidden;
+  border: 1px solid #2f4468;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #3f8cff, #62f0ff);
+}
+
+.hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9cb3df;
+}
+
+@media (max-width: 1200px) {
+  .chartGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .layout {
+    padding: 12px;
+  }
+
+  .cards {
+    grid-template-columns: repeat(auto-fill, minmax(min(120px, 100%), 1fr));
+  }
+
+  .rackGrid {
+    max-height: min(70vh, 560px);
+  }
+}
+
+@media (max-width: 640px) {
+  .layout {
+    padding: 10px 12px;
+  }
+
+  .globalNav {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .globalNav .navSep {
+    display: none;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar .hint {
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .topbar .topnav {
+    align-self: flex-start;
+  }
+
+  .controlGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .card p {
+    font-size: 16px;
+  }
+
+  .progressInfo {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+.error {
+  background: #7a2430;
+  border: 1px solid #ca4f5f;
+  border-radius: 8px;
+  padding: 8px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}

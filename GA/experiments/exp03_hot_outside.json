@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "genes": {
+    "target_chip_c": 62.92519575966365,
+    "kp": 0.24946496275227148,
+    "fan_base": 45.211558379290054,
+    "k_fan": 4.201335036556836,
+    "max_delta_sp": 1.1945207235064463
+  },
+  "fitness_best": 296070.7221315474,
+  "fitness_by_generation": [
+    347132.88975285593,
+    347132.88975285593,
+    335785.3040262533,
+    335785.3040262533,
+    309432.3595286124,
+    309432.3595286124,
+    309432.3595286124,
+    304096.11726537993,
+    304096.11726537993,
+    296070.7221315474
+  ],
+  "training": {
+    "episode": {
+      "n_steps": 70,
+      "delta_time": 10.0,
+      "control_interval_steps": 5,
+      "seed": 42,
+      "setpoint0": 22.0,
+      "fan0": 65.0,
+      "cooling_mode": "mixed",
+      "mean_load": 0.55,
+      "std_load": 0.12,
+      "outside_temp": 34.0
+    },
+    "chip_temp_limit_c": 72.0,
+    "temp_penalty_weight": 500.0,
+    "rng_seed": 123,
+    "rng_seed_effective": 4112085921
+  },
+  "extra": {
+    "cli": {
+      "twin_base": "http://127.0.0.1:8000",
+      "out": "GA/experiments/exp03_hot_outside.json",
+      "population": 8,
+      "generations": 10,
+      "seed": 42,
+      "rng_seed": 123,
+      "mix_rng_with_scenario": true,
+      "n_steps": 70,
+      "delta_time": 10.0,
+      "control_interval": 5,
+      "outside_temp": 34.0
+    }
+  }
+}

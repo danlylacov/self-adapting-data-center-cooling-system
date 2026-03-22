@@ -1,0 +1,24 @@
+{
+  "train_end_idx": 470,
+  "val_end_idx": 571,
+  "horizon_hours": 48,
+  "encoder_length_hours": 240,
+  "loss_type": "NormalDistributionLoss",
+  "lags_hours": [
+    24
+  ],
+  "categorical_cols": [
+    "hour_of_day",
+    "day_of_week",
+    "month"
+  ],
+  "known_reals": [
+    "hour_sin",
+    "hour_cos",
+    "is_holiday",
+    "maintenance_event",
+    "peak_event"
+  ],
+  "model_ckpt_path": "models/predict_load/artifacts/deepar_model_deepar_serving.ckpt",
+  "dataset_pkl_path": "models/predict_load/artifacts/deepar_dataset_deepar_serving.pkl"
+}

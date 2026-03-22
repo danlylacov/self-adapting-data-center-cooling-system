@@ -1,0 +1,43 @@
+# Jupyter
+*.ipynb
+.ipynb_checkpoints/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Node / frontend
+node_modules/
+**/node_modules/
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+.~lock.*#
+*~
+
+# Cursor
+.cursor/
+
+# Logs
+*.log
+
+# Docker / local
+*.local

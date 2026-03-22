@@ -1,0 +1,128 @@
+# Единый стек: API двойника, ML-сервисы, оркестратор, веб-UI.
+# Запуск из корня репозитория: docker compose up --build
+#
+# Порты на хосте: 80 (web), 8000 (twin), 8010–8013 (модели), 8030 (orchestrator).
+# Переменные для сборки фронта (куда ходит браузер), при необходимости:
+#   VITE_API_BASE=http://127.0.0.1:8000 VITE_ORCHESTRATOR_BASE=http://127.0.0.1:8030 docker compose build web
+
+services:
+  twin:
+    build:
+      context: .
+      dockerfile: DC_digital_twin/Dockerfile
+    container_name: dc-twin
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  predict-load:
+    build:
+      context: .
+      dockerfile: models/predict_load/Dockerfile
+    container_name: dc-predict-load
+    ports:
+      - "8010:8010"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  predict-pue:
+    build:
+      context: .
+      dockerfile: models/predict_pue/Dockerfile
+    container_name: dc-predict-pue
+    ports:
+      - "8011:8011"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8011/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  predict-server-temp:
+    build:
+      context: .
+      dockerfile: models/predict_server_temp/Dockerfile
+    container_name: dc-predict-server-temp
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  predict-ga:
+    build:
+      context: .
+      dockerfile: models/predict_ga/Dockerfile
+    container_name: dc-predict-ga
+    ports:
+      - "8013:8013"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8013/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: orchestrator/Dockerfile
+    container_name: dc-orchestrator
+    ports:
+      - "8030:8030"
+    environment:
+      TWIN_BASE: http://twin:8000
+      PUE_BASE: http://predict-pue:8011
+      TEMP_BASE: http://predict-server-temp:8002
+      LOAD_BASE: http://predict-load:8010
+      GA_BASE: http://predict-ga:8013
+    depends_on:
+      twin:
+        condition: service_healthy
+      predict-load:
+        condition: service_healthy
+      predict-pue:
+        condition: service_healthy
+      predict-server-temp:
+        condition: service_healthy
+      predict-ga:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8030/health')\""]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: DC_digital_twin/web/Dockerfile
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://127.0.0.1:8000}
+        VITE_ORCHESTRATOR_BASE: ${VITE_ORCHESTRATOR_BASE:-http://127.0.0.1:8030}
+    container_name: dc-web
+    ports:
+      - "8080:80"
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  default:
+    name: dc-net

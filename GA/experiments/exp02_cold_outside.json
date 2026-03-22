@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "genes": {
+    "target_chip_c": 66.74429566691536,
+    "kp": 0.1456986864542689,
+    "fan_base": 38.89887810081511,
+    "k_fan": 3.881737959742766,
+    "max_delta_sp": 1.3893922920668378
+  },
+  "fitness_best": 198617.516527758,
+  "fitness_by_generation": [
+    286982.23633678094,
+    286982.23633678094,
+    280658.0650232272,
+    280576.55589771125,
+    280576.55589771125,
+    227432.427062491,
+    227432.427062491,
+    218148.21185013975,
+    198617.516527758,
+    198617.516527758
+  ],
+  "training": {
+    "episode": {
+      "n_steps": 70,
+      "delta_time": 10.0,
+      "control_interval_steps": 5,
+      "seed": 42,
+      "setpoint0": 22.0,
+      "fan0": 65.0,
+      "cooling_mode": "mixed",
+      "mean_load": 0.55,
+      "std_load": 0.12,
+      "outside_temp": 22.0
+    },
+    "chip_temp_limit_c": 72.0,
+    "temp_penalty_weight": 500.0,
+    "rng_seed": 123,
+    "rng_seed_effective": 4112097921
+  },
+  "extra": {
+    "cli": {
+      "twin_base": "http://127.0.0.1:8000",
+      "out": "GA/experiments/exp02_cold_outside.json",
+      "population": 8,
+      "generations": 10,
+      "seed": 42,
+      "rng_seed": 123,
+      "mix_rng_with_scenario": true,
+      "n_steps": 70,
+      "delta_time": 10.0,
+      "control_interval": 5,
+      "outside_temp": 22.0
+    }
+  }
+}

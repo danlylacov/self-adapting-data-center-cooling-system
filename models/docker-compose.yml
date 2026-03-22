@@ -1,0 +1,66 @@
+# Устаревший фрагмент стека: полный набор сервисов — см. docker-compose.yml в корне репозитория.
+services:
+  predict-load:
+    build:
+      context: ..
+      dockerfile: models/predict_load/Dockerfile
+    container_name: predict-load
+    ports:
+      - "8010:8010"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  predict-pue:
+    build:
+      context: ..
+      dockerfile: models/predict_pue/Dockerfile
+    container_name: predict-pue
+    ports:
+      - "8011:8011"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8011/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  predict-server-temp:
+    build:
+      context: ..
+      dockerfile: models/predict_server_temp/Dockerfile
+    container_name: predict-server-temp
+    environment:
+      # volume ../:/workspace — корень репозитория v2
+      MODEL_PATH: /workspace/models/predict_server_temp/temp_predictor_mdot002_75_300s.pt
+      META_PATH: /workspace/models/predict_server_temp/temp_predictor_mdot002_75_300s_meta.json
+    volumes:
+      - ../:/workspace:ro
+    ports:
+      - "8002:8002"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: orchestrator/Dockerfile
+    container_name: dc-orchestrator
+    ports:
+      - "8030:8030"
+    environment:
+      TWIN_BASE: http://host.docker.internal:8000
+      PUE_BASE: http://host.docker.internal:8011
+      TEMP_BASE: http://host.docker.internal:8002
+      LOAD_BASE: http://host.docker.internal:8010
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles:
+      - orchestrator

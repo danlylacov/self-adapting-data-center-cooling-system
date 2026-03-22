@@ -1,0 +1,363 @@
+% Математическая модель цифрового двойника ЦОД (реализация DC_digital_twin)
+% Компиляция: pdflatex mathematical_model.tex (или latexmk)
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian,english]{babel}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\title{Математическая модель цифрового двойника\\серверного помещения (реализация \texttt{DC\_digital\_twin})}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Документ формализует дискретную тепловую и энергетическую модель, реализованную в проекте
+\texttt{DC\_digital\_twin}: стойка с серверами, рециркуляция воздуха, CRAC/чиллер в нескольких режимах,
+агрегированное помещение с возвратом воздуха, генератор нагрузки и метрики PUE.
+Константы и обозначения согласованы с исходным кодом (\texttt{server.py}, \texttt{rack.py},
+\texttt{cooling.py}, \texttt{room.py}, \texttt{simulator.py}, \texttt{load\_generator.py}).
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%-----------------------------------------------------------------------------%
+\section{Введение и структура модели}
+%-----------------------------------------------------------------------------%
+
+Симулятор описывает один \emph{горячий/холодный коридор} в виде одной стойки с $N$ серверами и
+агрегированной тепловой моделью помещения. Время дискретно:
+\begin{equation}
+  t_{k+1} = t_k + \Delta t, \qquad k = 0,1,2,\ldots
+\end{equation}
+где $\Delta t$ --- шаг по модельному времени (секунды), задаётся API/конфигом (\texttt{delta\_time} или
+\texttt{simulator.time\_step}).
+
+На каждом шаге выполняется последовательность:
+\begin{enumerate}[label=\arabic*.]
+  \item обновление внешней среды (ручной режим, профиль Open-Meteo или CSV);
+  \item генерация вектора загрузок $\mathbf{u}^{(k)} \in [0,1]^N$;
+  \item расчёт теплового состояния контура охлаждения (температура подачи $T_{\mathrm{sup}}$ и
+    отобранная холодопроизводительность $Q_{\mathrm{coil}}$);
+  \item обновление стойки (входные температуры с рециркуляцией, затем серверы);
+  \item обновление помещения (температура объёма $T_{\mathrm{room}}$, возврат $T_{\mathrm{ret}}$).
+\end{enumerate}
+
+%-----------------------------------------------------------------------------%
+\section{Обозначения и параметры}
+%-----------------------------------------------------------------------------%
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}ll@{}}
+\toprule
+Символ & Смысл \\
+\midrule
+$c_p$ & $1005\ \mathrm{J/(kg\cdot K)}$ --- удельная теплоёмкость воздуха \\
+$\rho_{\mathrm{air}}$ & $1.2\ \mathrm{kg/m^3}$ --- плотность воздуха \\
+$\varepsilon$ & эффективность теплообменника сервера ($\texttt{epsilon}$, по умолчанию $0.8$) \\
+$P_{\mathrm{idle}}, P_{\mathrm{max}}$ & мощность сервера в простое и под полной нагрузкой, Вт \\
+$C_{\mathrm{th}}$ & теплоёмкость чипа, Дж/К \\
+$\dot m_{\mathrm{srv}}$ & эквивалентный массовый расход воздуха через теплообменник сервера, кг/с \\
+$T_{\max}$ & номинальная верхняя температура чипа в конфиге, $^\circ\mathrm{C}$ \\
+$V$ & объём помещения, м$^3$ \\
+$UA$ & \texttt{wall\_heat\_transfer}: теплопотери через ограждение, Вт/К \\
+$G_{\mathrm{mix}}$ & \texttt{supply\_mixing\_conductance}: слабый обмен зала с подачей, Вт/К \\
+$f_{\mathrm{mass}}$ & \texttt{thermal\_mass\_factor}: множитель к теплоёмкости воздуха в зале \\
+$\dot m_{\mathrm{air}}$ & \texttt{airflow\_m\_dot}: массовый расход воздуха в контуре CRAC, кг/с \\
+$Q_{\mathrm{cap}}$ & \texttt{capacity}: номинальная холодопроизводительность CRAC, Вт \\
+$s_{\mathrm{fan}}$ & относительная скорость вентиляторов CRAC, $s_{\mathrm{fan}}\in[0,1]$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%-----------------------------------------------------------------------------%
+\section{Генератор нагрузки}
+%-----------------------------------------------------------------------------%
+
+Для каждого сервера $i=1,\ldots,N$ задаётся утилизация $u_i^{(k)}\in[0,1]$.
+
+\paragraph{Случайный режим (\texttt{random}).}
+Независимые выборки $\mathcal{N}(\mu,\sigma^2)$ с последующим ограничением $[0,1]$ и смесью с медленным трендом:
+\begin{equation}
+  u_i^{(k)} \;=\; \mathrm{clip}\Big( \tilde u_i^{(k)} \cdot 0.7 + \big(0.5 + 0.2\sin(k/100)\big)\cdot 0.3,\; 0,\; 1 \Big),
+\end{equation}
+где $\tilde u_i^{(k)} \sim \mathcal{N}(\mu,\sigma^2)$, $\mu = \texttt{mean\_load}$, $\sigma = \texttt{std\_load}$.
+
+\paragraph{Постоянный (\texttt{constant}), периодический (\texttt{periodic}), датасет (\texttt{dataset}).}
+В коде заданы соответствующие эвристики (суточный цикл, чтение колонки \texttt{load} и вариация между серверами).
+
+%-----------------------------------------------------------------------------%
+\section{Стойка и рециркуляция воздуха}
+%-----------------------------------------------------------------------------%
+
+Вектор температур на выходе серверов: $\mathbf{T}_{\mathrm{out}} = (T_{\mathrm{out},1},\ldots,T_{\mathrm{out},N})^T$.
+Задана матрица рециркуляции $\mathbf{R}\in\mathbb{R}^{N\times N}$, зависящая от \texttt{containment}:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{hot\_aisle}: слабые связи «сверху вниз'';
+  \item \texttt{cold\_aisle}: связи от нижних к верхним;
+  \item \texttt{none}: равномерное слабое перемешивание: $R_{ij} = 0.02$ при $i\neq j$, $R_{ii}=0$.
+\end{itemize}
+
+Температура на входе $i$-го сервера:
+\begin{equation}
+  T_{\mathrm{in},i} \;=\; T_{\mathrm{sup}} + \sum_{j=1}^{N} R_{ij}\,(T_{\mathrm{out},j} - T_{\mathrm{sup}}).
+\end{equation}
+Затем применяется ограничение (эвристика стабильности):
+\begin{equation}
+  T_{\mathrm{in},i} \;\in\; \big[\,T_{\mathrm{sup}}-2,\; \min(T_{\mathrm{sup}}+15,\, T_{\mathrm{in},i})\,\big].
+\end{equation}
+
+%-----------------------------------------------------------------------------%
+\section{Модель сервера (чип и воздух на выходе)}
+%-----------------------------------------------------------------------------%
+
+Мощность (вся идёт в тепло):
+\begin{equation}
+  P_i \;=\; P_{\mathrm{idle}} + (P_{\mathrm{max}} - P_{\mathrm{idle}})\, u_i .
+\end{equation}
+
+Тепло, передаваемое воздуху (неотрицательное):
+\begin{equation}
+  \dot Q_{\mathrm{air},i} \;=\; \dot m_{\mathrm{srv}}\, c_p\, \varepsilon\, \max\bigl(0,\; T_{\mathrm{chip},i} - T_{\mathrm{in},i}\bigr).
+\end{equation}
+
+Уравнение баланса для температуры чипа (явная схема Эйлера):
+\begin{equation}
+  \frac{\mathrm{d} T_{\mathrm{chip},i}}{\mathrm{d} t}
+  \;=\; \frac{P_i - \dot Q_{\mathrm{air},i}}{C_{\mathrm{th}}},
+  \qquad
+  T_{\mathrm{chip},i}^{(k+1)} = T_{\mathrm{chip},i}^{(k)} + \Delta t\,\frac{P_i - \dot Q_{\mathrm{air},i}}{C_{\mathrm{th}}}.
+\end{equation}
+
+Температура воздуха на выходе (модель теплообменника):
+\begin{equation}
+  T_{\mathrm{out},i} \;=\; T_{\mathrm{in},i} + \varepsilon\,\bigl(T_{\mathrm{chip},i} - T_{\mathrm{in},i}\bigr).
+\end{equation}
+
+Ограничения после шага:
+\begin{equation}
+  T_{\mathrm{chip},i} \ge T_{\mathrm{in},i}, \qquad T_{\mathrm{out},i} \ge T_{\mathrm{in},i}.
+\end{equation}
+
+\paragraph{Вентилятор сервера (эвристика).}
+Пусть знаменатель $D_i = T_{\max} - T_{\mathrm{in},i}$. Тогда
+\begin{equation}
+  s_{\mathrm{fan},i}^{\mathrm{srv}} \;=\; \mathrm{clip}\left( \frac{T_{\mathrm{chip},i} - T_{\mathrm{in},i}}{D_i}\cdot 1.2,\; 0.3,\; 1 \right).
+\end{equation}
+
+\paragraph{Замечание.}
+Параметр \texttt{chip\_temp\_clip\_multiplier} присутствует в конфигурации реализма, но в динамике
+\texttt{Server.update} верхний клип $T_{\mathrm{chip}}$ не применяется (используется только нижняя граница
+относительно $T_{\mathrm{in}}$).
+
+%-----------------------------------------------------------------------------%
+\section{Контур охлаждения CRAC}
+%-----------------------------------------------------------------------------%
+
+\noindent\textbf{Связка с моделью помещения.}
+В \texttt{DataCenterSimulator.step} в \texttt{compute\_thermal\_state} подставляется не только
+сглаженный \texttt{return\_temperature}, а
+\begin{equation}
+  T_{\mathrm{ret}} \;:=\; \max\bigl(T_{\mathrm{return}},\, T_{\mathrm{room}}\bigr),
+\end{equation}
+иначе при $T_{\mathrm{return}} < T_{\mathrm{set}}$ величина
+$\max(0,\,T_{\mathrm{ret}} - T_{\mathrm{set}})$ в $Q_{\mathrm{req}}$ обнуляется, пока объём зала уже
+нагревается от стоек (разные временные константы), и охлаждение не включается в теплобалансе зала.
+
+\subsection{Потребность по воздушной стороне}
+Заданы (эффективная) температура возврата $T_{\mathrm{ret}}$ и целевая температура подачи
+$T_{\mathrm{sup}}^{\mathrm{tgt}}$. Требуемая тепловая мощность на катушке при идеальном контакте потоков:
+\begin{equation}
+  Q_{\mathrm{req}} \;=\; \dot m_{\mathrm{air}}\, c_p\, \max\bigl(0,\; T_{\mathrm{ret}} - T_{\mathrm{sup}}^{\mathrm{tgt}}\bigr).
+\end{equation}
+
+Доступная номинальная мощность с учётом вентиляторов CRAC:
+\begin{equation}
+  Q_{\mathrm{avail}} \;=\; Q_{\mathrm{cap}}\, s_{\mathrm{fan}}, \qquad s_{\mathrm{fan}} = \mathrm{clip}(\texttt{fan\_speed},\,0,\,1).
+\end{equation}
+
+Фактическая отобранная мощность $Q_{\mathrm{act}} = \min(Q_{\mathrm{req}}, Q_{\mathrm{avail}})$ с уточнением режима
+(ниже). Температура подачи в стойку после катушки:
+\begin{equation}
+  T_{\mathrm{sup}} \;=\; T_{\mathrm{ret}} - \frac{Q_{\mathrm{act}}}{\dot m_{\mathrm{air}}\, c_p}
+  \quad (\text{знаменатель защищён от нуля в коде}).
+\end{equation}
+
+\subsection{Режим \texttt{free} (фрикулинг)}
+Если $T_{\mathrm{out}} < T_{\mathrm{ret}}$, используется экономайзер: целевая подача с подходом:
+\begin{equation}
+  T_{\mathrm{sup}}^{\mathrm{tgt}} \;=\; \max\bigl(T_{\mathrm{out}} + T_{\mathrm{approach}},\, 0\bigr),
+\end{equation}
+где $T_{\mathrm{approach}} = \texttt{supply\_approach}$. Далее $Q_{\mathrm{req}}$ считается от
+$(T_{\mathrm{ret}}, T_{\mathrm{sup}}^{\mathrm{tgt}})$, $Q_{\mathrm{act}} = \min(Q_{\mathrm{req}}, Q_{\mathrm{avail}})$,
+и $T_{\mathrm{sup}}$ по формуле выше.
+Если же $T_{\mathrm{out}} \ge T_{\mathrm{ret}}$ (наружный воздух не холоднее возврата), экономайзер не
+даёт охлаждения; в реализации к уставке включается тот же расчёт, что и для \texttt{chiller}
+(механическое охлаждение до $T_{\mathrm{set}}$), иначе при жаркой наружке $Q_{\mathrm{act}}$ обнулялся бы
+и температура зала росла бы неограниченно.
+
+\subsection{Режим \texttt{chiller}}
+$T_{\mathrm{sup}}^{\mathrm{tgt}} = T_{\mathrm{set}}$ (уставка CRAC, ограничивается в коде интервалом
+примерно $[18,27]^\circ\mathrm{C}$). Далее та же схема $Q_{\mathrm{req}}, Q_{\mathrm{act}}, T_{\mathrm{sup}}$.
+
+\subsection{Режим \texttt{mixed}}
+Целевая подача по уставке $T_{\mathrm{set}}$. Полная потребность до уставки:
+$Q_{\mathrm{req}}^{\mathrm{tot}} = Q_{\mathrm{req}}(T_{\mathrm{ret}}, T_{\mathrm{set}})$.
+Потенциал фрикулинга (если $T_{\mathrm{out}} < T_{\mathrm{ret}}$):
+$T_{\mathrm{sup}}^{\mathrm{free}} = \max(T_{\mathrm{out}} + T_{\mathrm{approach}}, 0)$,
+$Q_{\mathrm{free}} = Q_{\mathrm{req}}(T_{\mathrm{ret}}, T_{\mathrm{sup}}^{\mathrm{free}})$; иначе $Q_{\mathrm{free}} = 0$.
+Тогда в коде
+\begin{equation}
+  Q_{\mathrm{act}} \;=\; \min\bigl(Q_{\mathrm{req}}^{\mathrm{tot}},\; Q_{\mathrm{avail}},\; Q_{\mathrm{free}} + Q_{\mathrm{avail}}\bigr).
+\end{equation}
+При $Q_{\mathrm{free}} \ge 0$ третий аргумент не меньше $Q_{\mathrm{avail}}$, поэтому фактически
+$Q_{\mathrm{act}} = \min(Q_{\mathrm{req}}^{\mathrm{tot}}, Q_{\mathrm{avail}})$. Температура подачи снова
+$T_{\mathrm{sup}} = T_{\mathrm{ret}} - Q_{\mathrm{act}}/(\dot m_{\mathrm{air}} c_p)$.
+
+\subsection{COP и электрическая мощность охлаждения}
+Для CRAC задан квадратичный полином по наружной температуре $T_{\mathrm{out}}$:
+\begin{equation}
+  \mathrm{COP}(T_{\mathrm{out}}) \;=\; \max\bigl(1,\; a T_{\mathrm{out}}^2 + b T_{\mathrm{out}} + c\bigr),
+\end{equation}
+коэффициенты $(a,b,c) = \texttt{cop\_curve}$.
+
+Мощность вентиляторов CRAC:
+\begin{equation}
+  P_{\mathrm{fan}} \;=\;
+  \begin{cases}
+    P_{\mathrm{fan}}^{\max}\, s_{\mathrm{fan}}^3, & \texttt{law}=\texttt{cubic},\\[4pt]
+    P_{\mathrm{fan}}^{\max}\, s_{\mathrm{fan}}, & \texttt{law}=\texttt{linear}.
+  \end{cases}
+\end{equation}
+
+В \texttt{compute\_total power} для телеметрии:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{free}: $P_{\mathrm{cool}} = P_{\mathrm{fan}}$ (компрессор не учитывается);
+  \item \texttt{chiller}: $P_{\mathrm{cool}} = Q_{\mathrm{act}}/\mathrm{COP}_{\mathrm{chiller}}(T_{\mathrm{out}}) + P_{\mathrm{fan}}$
+    через объект \texttt{Chiller};
+  \item \texttt{mixed}: $P_{\mathrm{cool}} = Q_{\mathrm{act}}/\mathrm{COP}(T_{\mathrm{out}}) + P_{\mathrm{fan}}$.
+\end{itemize}
+
+Здесь $Q_{\mathrm{act}}$ заново вычисляется внутри \texttt{compute\_thermal\_state} при вызове
+\texttt{compute\_total\_power}. Флаг \texttt{use\_dynamic\_crac\_power} влияет на то, какая температура возврата
+подставляется при расчёте PUE (текущая $T_{\mathrm{ret}}$ или предыдущее значение).
+
+%-----------------------------------------------------------------------------%
+\section{Модель помещения}
+%-----------------------------------------------------------------------------%
+Теплоёмкость «среднего» воздуха зала:
+\begin{equation}
+  C_{\mathrm{room}} \;=\; V\, \rho_{\mathrm{air}}\, c_p\, f_{\mathrm{mass}}.
+\end{equation}
+
+Теплопотери через ограждение и слабый обмен с подачей CRAC:
+\begin{equation}
+  Q_{\mathrm{wall}} \;=\; UA\,(T_{\mathrm{out}}^{\mathrm{env}} - T_{\mathrm{room}}), \qquad
+  Q_{\mathrm{mix}} \;=\; G_{\mathrm{mix}}\,(T_{\mathrm{sup}} - T_{\mathrm{room}}),
+\end{equation}
+где $T_{\mathrm{out}}^{\mathrm{env}}$ --- наружная температура (ручная или из профиля).
+
+Суммарное тепловыделение стойки принимается равным суммарной электрической мощности серверов
+$Q_{\mathrm{racks}} = \sum_i P_i$. Тепло, отбираемое катушкой CRAC из воздушного контура на шаге,
+совпадает с $Q_{\mathrm{act}}$ из \texttt{compute\_thermal\_state} (неотрицательно). Обновление средней
+температуры зала:
+\begin{equation}
+  T_{\mathrm{room}}^{(k+1)} \;=\; T_{\mathrm{room}}^{(k)}
+  + \frac{\Delta t}{C_{\mathrm{room}}}\,\Bigl(Q_{\mathrm{racks}} + Q_{\mathrm{wall}} + Q_{\mathrm{mix}}
+  - Q_{\mathrm{act}}\Bigr).
+\end{equation}
+Без члена $-Q_{\mathrm{act}}$ при типичных $Q_{\mathrm{racks}}$ (кВт) и малых $UA$, $G_{\mathrm{mix}}$
+(десятки Вт/К) баланс оказывается всегда положительным и $T_{\mathrm{room}}$ монотонно растёт; слабый
+обмен с подачей не заменяет явный отбор тепла установкой.
+
+\paragraph{Возвратный воздух.}
+Масса воздуха зала $m_{\mathrm{room}} = \max(V \rho_{\mathrm{air}}, \varepsilon_{\mathrm{mach}})$.
+За шаг перемещается масса $\Delta m = \dot m_{\mathrm{air}}\,\Delta t$. Доля обновления:
+\begin{equation}
+  \alpha \;=\; \mathrm{clip}\left(\frac{\Delta m}{m_{\mathrm{room}}},\, 0,\, 1\right).
+\end{equation}
+Целевая температура возврата как смесь среднего выхлопа стойки и зала:
+\begin{equation}
+  T_{\mathrm{ret}}^{\mathrm{tgt}} \;=\; 0.65\,\overline{T_{\mathrm{out}}} + 0.35\, T_{\mathrm{room}},
+  \qquad
+  \overline{T_{\mathrm{out}}} = \frac{1}{N}\sum_{i=1}^{N} T_{\mathrm{out},i}.
+\end{equation}
+
+Рекуррентное сглаживание:
+\begin{equation}
+  T_{\mathrm{ret}}^{(k+1)} \;=\; T_{\mathrm{ret}}^{(k)} + \alpha\,\bigl(T_{\mathrm{ret}}^{\mathrm{tgt}} - T_{\mathrm{ret}}^{(k)}\bigr).
+\end{equation}
+
+Поля \texttt{temp\_clip\_min/max} в объекте помещения задаются из конфигурации реализма, но в текущей
+реализации \texttt{Room.update} клип $T_{\mathrm{room}}$ после интегрирования \emph{не} применяется
+(значения хранятся для API/метаданных).
+
+%-----------------------------------------------------------------------------%
+\section{Метрики PUE и телеметрия}
+%-----------------------------------------------------------------------------%
+
+Суммарная мощность IT:
+\begin{equation}
+  P_{\mathrm{IT}} \;=\; \sum_{i=1}^{N} P_i .
+\end{equation}
+
+Мощность инфраструктуры охлаждения $P_{\mathrm{inf}}$ берётся из \texttt{compute\_total\_power} (см.\ раздел~6).
+Тогда
+\begin{equation}
+  \mathrm{PUE} \;=\; \frac{P_{\mathrm{IT}} + P_{\mathrm{inf}}}{P_{\mathrm{IT}}}
+  \quad (\text{при } P_{\mathrm{IT}}>0;\ \text{иначе в коде } \mathrm{PUE}=1).
+\end{equation}
+
+Риск перегрева (доля серверов с $T_{\mathrm{chip}} > T_{\mathrm{thr}}$):
+\begin{equation}
+  r_{\mathrm{oh}} \;=\; \frac{1}{N}\sum_{i=1}^{N} \mathbf{1}\{ T_{\mathrm{chip},i} > T_{\mathrm{thr}}\},
+\end{equation}
+$T_{\mathrm{thr}} = \texttt{overheat\_threshold\_c}$ (по умолчанию $75^\circ\mathrm{C}$).
+
+%-----------------------------------------------------------------------------%
+\section{Связность и порядок вычислений на шаге}
+%-----------------------------------------------------------------------------%
+
+В псевдокоде (соответствует \texttt{DataCenterSimulator.step}):
+\begin{verbatim}
+  weather -> load_profile
+  thermal_state = cooling.compute_thermal_state(T_ret, T_outside)
+  T_sup = thermal_state.supply_temperature
+  rack.update(T_sup, load_profile, dt)   // inlet from R, then servers
+  Q_racks = sum(P_i)
+  T_exhaust_avg = mean(T_out,i)
+  room.update(Q_racks, Q_coil, dt, T_exhaust_avg, m_dot_air, T_sup)
+  t += dt; step++
+\end{verbatim}
+
+На одном шаге $T_{\mathrm{ret}}$ при расчёте \texttt{compute\_thermal\_state} --- это значение с
+\emph{предыдущего} шага; после обновления помещения $T_{\mathrm{ret}}$ меняется для следующего шага.
+
+%-----------------------------------------------------------------------------%
+\section{Заключение}
+%-----------------------------------------------------------------------------%
+
+Модель является \emph{упрощённой инженерной}: линейные рециркуляции, явный Эйлер, кусочно-линейные CRAC-режимы,
+отсутствие влажностной психрометрии в балансах (влажность и ветер могут храниться для внешних/ML-компонентов).
+Для публикаций и отчётов рекомендуется указывать версию кода и значения $\Delta t$, $N$, $Q_{\mathrm{cap}}$,
+$\dot m_{\mathrm{air}}$.
+
+\appendix
+\section{Компиляция}
+\texttt{pdflatex mathematical\_model.tex}
+
+\begin{thebibliography}{9}
+\bibitem{code}
+Исходный код проекта: \texttt{DC\_digital\_twin/src/models/*.py}, \texttt{DC\_digital\_twin/src/core/simulator.py}.
+\end{thebibliography}
+
+\end{document}

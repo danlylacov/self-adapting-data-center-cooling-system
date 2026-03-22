@@ -1,0 +1,140 @@
+% Блок-схема цифрового двойника (DC_digital_twin).
+% В узлах — только названия и краткие входы/выходы; формулы — ниже.
+% Компиляция: pdflatex twin_block_diagram.tex
+%
+% Редактирование: TeXstudio, VS Code + LaTeX Workshop, Overleaf.
+
+\documentclass[12pt,a4paper,landscape]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc}
+
+\usepackage[margin=1.4cm]{geometry}
+
+\title{Блок-схема модели ЦОД (киберфизический контур)}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\noindent
+\textbf{Шаг} $k$\textbf{:} сначала среда и нагрузка, затем расчёт CRAC по $T_{\mathrm{ret}}$ с \emph{предыдущего} шага; далее стойка и серверы; затем помещение и новый $T_{\mathrm{ret}}$ для шага $k{+}1$.
+
+\vspace{0.6em}
+
+% --- Схема: только потоки, без длинных формул ---
+\begin{center}
+\begin{tikzpicture}[
+  font=\footnotesize,
+  >=Stealth,
+  blk/.style={
+    rectangle,
+    draw=black!70,
+    rounded corners=3pt,
+    thick,
+    align=left,
+    inner sep=8pt,
+    minimum width=3.1cm,
+  },
+  lbl/.style={font=\scriptsize, inner sep=2pt, fill=white, rounded corners=1pt},
+]
+
+  % Верхний ряд: среда и нагрузка
+  \node[blk, fill=blue!8] (env) {%
+    \textbf{Среда}\\[0.15em]
+    \textit{выход:} $T_{\mathrm{out}}^{\mathrm{env}}$, при необходимости влажность, ветер};
+
+  \node[blk, fill=green!10, right=1.8cm of env] (load) {%
+    \textbf{Генератор нагрузки}\\[0.15em]
+    \textit{выход:} $\mathbf{u}^{(k)} \in [0,1]^N$};
+
+  % Центр: CRAC
+  \coordinate (midtop) at ($(env)!0.5!(load)$);
+  \node[blk, fill=orange!12, minimum width=4.6cm, below=1.0cm of midtop] (crac) {%
+    \textbf{CRAC / охлаждение}\\[0.15em]
+    \textit{управление:} $T_{\mathrm{set}}$, $s_{\mathrm{fan}}$\\[0.1em]
+    \textit{вход:} $T_{\mathrm{ret}}$ (с шага $k{-}1$), $T_{\mathrm{out}}^{\mathrm{env}}$\\[0.1em]
+    \textit{выход:} $T_{\mathrm{sup}}$, $Q_{\mathrm{act}}$, мощность $P_{\mathrm{inf}}$};
+
+  % Нижний ряд: стойка + сервер слева, помещение справа
+  \node[blk, fill=yellow!10, below left=1.05cm and 0.15cm of crac] (rack) {%
+    \textbf{Стойка}\\[0.15em]
+    матрица $\mathbf{R}$ (\texttt{containment})\\[0.1em]
+    \textit{вход:} $T_{\mathrm{sup}}$, $\mathbf{T}_{\mathrm{out}}$\\[0.1em]
+    \textit{выход:} $\mathbf{T}_{\mathrm{in}}$};
+
+  \node[blk, fill=yellow!16, below=0.75cm of rack] (srv) {%
+    \textbf{Серверы} $i=1\ldots N$\\[0.15em]
+    \textit{состояние:} $T_{\mathrm{chip},i}$, $T_{\mathrm{out},i}$\\[0.1em]
+    \textit{внутр.:} вентилятор $s_{\mathrm{fan},i}^{\mathrm{srv}}$ (авто)};
+
+  \node[blk, fill=purple!10, below right=1.05cm and 0.15cm of crac] (room) {%
+    \textbf{Помещение}\\[0.15em]
+    \textit{вход:} $Q_{\mathrm{racks}}$, $Q_{\mathrm{act}}$, $T_{\mathrm{sup}}$, $T_{\mathrm{out}}^{\mathrm{env}}$\\[0.1em]
+    \textit{состояние:} $T_{\mathrm{room}}$, $T_{\mathrm{ret}}$};
+
+  \node[blk, fill=gray!15, below=1.0cm of $(srv)!0.5!(room)$, minimum width=5.5cm] (met) {%
+    \textbf{Метрики (телеметрия)}\\[0.15em]
+    PUE, $r_{\mathrm{oh}}$, мощности стоек и охлаждения};
+
+  % Связи: среда → CRAC и помещение; нагрузка → стойка (не в CRAC)
+  \draw[thick,->] (env.south) -- +(0,-0.28) -| node[lbl, pos=0.12, above] {$T_{\mathrm{out}}^{\mathrm{env}}$} (crac.north);
+  \draw[thick,->] ($(env.south west)+(-0.15,0)$) |- node[lbl, pos=0.4, above, sloped] {\scriptsize $T_{\mathrm{out}}^{\mathrm{env}}$} (room.west);
+
+  \draw[thick,->] (load.south) -- +(0,-0.28) -| node[lbl, pos=0.12, above] {$\mathbf{u}^{(k)}$} (rack.north);
+
+  \draw[thick,->] (crac.south west) ++(-0.1,0) |- node[lbl, pos=0.28, above, sloped] {$T_{\mathrm{sup}}$} (rack.north);
+
+  \draw[thick,->] (rack) -- node[lbl, right] {$\mathbf{T}_{\mathrm{in}}$} (srv);
+
+  \draw[thick,->] (crac.south east) ++(0.1,0) |- node[lbl, pos=0.28, above, sloped] {$Q_{\mathrm{act}}$} (room.north);
+
+  \draw[thick,->] (srv.east) -| node[lbl, pos=0.4, below] {$Q_{\mathrm{racks}}$, $\overline{T_{\mathrm{out}}}$} (room.south);
+
+  \draw[thick,->] (room.north east) to[out=80,in=10, looseness=0.85]
+    node[lbl, pos=0.52, above] {$T_{\mathrm{ret}}$ (на шаг $k{+}1$)} (crac.east);
+
+  \draw[thick,->] (srv) |- (met);
+  \draw[thick,->] (room) |- (met);
+
+\end{tikzpicture}
+\end{center}
+
+\vspace{0.5em}
+
+% --- Формулы отдельно ---
+\noindent\textbf{Соответствие блокам (подробности в \texttt{mathematical\_model.tex}):}
+
+\begin{align*}
+  &\textbf{Стойка.}\quad
+  T_{\mathrm{in},i} = T_{\mathrm{sup}} + \sum_{j=1}^{N} R_{ij}\,(T_{\mathrm{out},j} - T_{\mathrm{sup}}).
+  \\[0.45em]
+  &\textbf{Сервер.}\quad
+  P_i = P_{\mathrm{idle}} + (P_{\mathrm{max}} - P_{\mathrm{idle}})\,u_i, \\[-0.1em]
+  &\qquad T_{\mathrm{chip},i}^{+} = T_{\mathrm{chip},i} + \Delta t\,\frac{P_i - \dot Q_{\mathrm{air},i}}{C_{\mathrm{th}}}, \qquad
+  T_{\mathrm{out},i} = T_{\mathrm{in},i} + \varepsilon\,(T_{\mathrm{chip},i} - T_{\mathrm{in},i}).
+  \\[0.45em]
+  &\textbf{CRAC.}\quad
+  Q_{\mathrm{req}} = \dot m_{\mathrm{air}}\, c_p\, \max\bigl(0,\, T_{\mathrm{ret}} - T_{\mathrm{sup}}^{\mathrm{tgt}}\bigr), \quad
+  Q_{\mathrm{avail}} = Q_{\mathrm{cap}}\, s_{\mathrm{fan}}, \\[-0.1em]
+  &\qquad Q_{\mathrm{act}} = \min(Q_{\mathrm{req}},\, Q_{\mathrm{avail}})\ \text{(по режимам)}, \quad
+  T_{\mathrm{sup}} = T_{\mathrm{ret}} - \dfrac{Q_{\mathrm{act}}}{\dot m_{\mathrm{air}}\, c_p}.
+  \\[0.45em]
+  &\textbf{Помещение.}\quad
+  T_{\mathrm{room}}^{+} = T_{\mathrm{room}} + \frac{\Delta t}{C_{\mathrm{room}}}\bigl(Q_{\mathrm{racks}} + Q_{\mathrm{wall}} + Q_{\mathrm{mix}} - Q_{\mathrm{act}}\bigr), \\[-0.1em]
+  &\qquad T_{\mathrm{ret}}^{\mathrm{tgt}} = 0{,}65\,\overline{T_{\mathrm{out}}} + 0{,}35\,T_{\mathrm{room}}
+  \ \text{(далее сглаживание по $\alpha$).}
+  \\[0.45em]
+  &\textbf{Метрики.}\quad
+  \mathrm{PUE} = \dfrac{P_{\mathrm{IT}} + P_{\mathrm{inf}}}{P_{\mathrm{IT}}}, \qquad
+  r_{\mathrm{oh}} = \frac{1}{N}\sum_{i=1}^{N} \mathbf{1}\{T_{\mathrm{chip},i} > T_{\mathrm{thr}}\}.
+\end{align*}
+
+\vspace{0.3em}
+\noindent\textit{Режимы охлаждения} \texttt{free} / \texttt{chiller} / \texttt{mixed}, COP$(T_{\mathrm{out}})$ и $P_{\mathrm{fan}}$ описаны в \texttt{mathematical\_model.tex}.
+
+\end{document}

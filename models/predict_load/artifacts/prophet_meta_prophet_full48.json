@@ -1,0 +1,29 @@
+{
+  "train_end_idx": 116,
+  "val_end_idx": 141,
+  "horizon_hours": 48,
+  "regressors": [
+    "is_holiday",
+    "maintenance_event",
+    "peak_event"
+  ],
+  "prophet_settings": {
+    "changepoint_prior_scale": 0.05,
+    "seasonality_mode": "additive",
+    "daily_seasonality": true,
+    "weekly_seasonality": true,
+    "yearly_seasonality": true
+  },
+  "metrics": {
+    "val": {
+      "mae": 11.836978273226542,
+      "rmse": 15.130468699272773,
+      "mape_pct": 8.186439293328032
+    },
+    "test": {
+      "mae": 56.54252851658388,
+      "rmse": 58.256388858459665,
+      "mape_pct": 38.934273264078925
+    }
+  }
+}

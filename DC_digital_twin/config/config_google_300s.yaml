@@ -1,0 +1,79 @@
+simulator:
+  name: "Rack_001"
+  time_step: 300.0  # 5 минут
+  realtime_factor: 10.0
+
+weather:
+  enabled: true
+  base_date: "2019-05-01"
+  lat: 55.7558
+  lon: 37.6173
+  timezone: "Europe/Moscow"
+  # Для физической части нам нужен только outside_temp.
+  # humidity/wind будут полезны ML-моделям (dataset builder может их подтянуть отдельно).
+  variables_physics:
+    temperature_2m: true
+  variables_ml:
+    humidity: "relative_humidity_2m"
+    wind_speed: "wind_speed_10m"
+
+rack:
+  height: 2.0
+  width: 0.8
+  depth: 1.2
+  num_units: 42
+  containment: "hot_aisle"
+
+servers:
+  default_profile: "dl380"
+  count: 42
+  arrangement: "uniform"
+  profiles:
+    dl380:
+      p_idle: 150
+      p_max: 400
+      t_max: 85
+      c_thermal: 5000
+      m_dot: 0.05
+
+cooling:
+  crac:
+    type: "chilled_water"
+    capacity: 30000
+    cop_curve: [0.002, -0.15, 4.0]
+    default_setpoint: 22.0
+  fans:
+    max_power: 2000
+    law: "cubic"
+
+room:
+  volume: 100
+  wall_heat_transfer: 50
+  enthalpy_mixing_efficiency: 0.2
+  initial_temperature: 22.0
+
+load_generator:
+  type: "dataset"
+  dataset_path: "data/google2019_load_300s.csv"
+  random_seed: 42
+
+mqtt:
+  enabled: false
+  broker: "localhost"
+  port: 1883
+  topic_prefix: "dc/sim/rack_001"
+  publish_rate: 1.0
+  qos: 1
+
+output:
+  enabled: true
+  format: "csv"
+  path: "results_google_300s"
+  save_interval: 100
+  compression: true
+
+logging:
+  level: "INFO"
+  format: "json"
+  file: "logs/simulator.log"
+

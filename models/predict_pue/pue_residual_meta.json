@@ -1,0 +1,49 @@
+{
+  "input_hours": 24,
+  "horizon_hours": 6,
+  "feature_count": 10,
+  "feature_cols": [
+    "room_temperature",
+    "cooling_setpoint",
+    "cooling_fan_speed",
+    "outside_temperature",
+    "humidity",
+    "wind_speed",
+    "avg_exhaust_temp",
+    "servers_power_total",
+    "pue_physics",
+    "residual"
+  ],
+  "X_mean": [
+    28.686077117919922,
+    22.0,
+    0.5,
+    11.916696548461914,
+    60.1507568359375,
+    14.153327941894531,
+    29.388601303100586,
+    147205.109375,
+    1.0434123277664185,
+    0.3569864332675934
+  ],
+  "X_std": [
+    0.43422654271125793,
+    9.999999974752427e-07,
+    9.999999974752427e-07,
+    5.076789855957031,
+    20.43025779724121,
+    6.486828327178955,
+    0.271489679813385,
+    5357.18994140625,
+    0.009003106504678726,
+    0.08186440169811249
+  ],
+  "model_config": {
+    "input_size": 10,
+    "hidden": 128,
+    "num_layers": 2,
+    "horizon_hours": 6
+  },
+  "best_val_nll": -2.9918906688690186,
+  "dataset_npz": "/home/daniil/Рабочий стол/bonch/v2/models/predict_pue/pue_dataset.npz"
+}

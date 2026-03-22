@@ -1,0 +1,219 @@
+% Блок-схема генетического алгоритма подбора параметров политики охлаждения (GA/ga_core.py).
+% Компиляция: pdflatex ga_block_diagram.tex
+%
+% Редактирование: TeXstudio, VS Code + LaTeX Workshop, Overleaf.
+
+\documentclass[12pt,a4paper,landscape]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric}
+
+\usepackage[margin=1.2cm]{geometry}
+
+\title{Блок-схема генетического алгоритма настройки политики охлаждения}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\noindent
+\textbf{Назначение:} минимизация приспособленности
+$F = E_{\mathrm{cool}} + w \cdot P_{\mathrm{temp}}$,
+где $E_{\mathrm{cool}}$~--- интеграл мощности охлаждения по эпизоду симуляции,
+$P_{\mathrm{temp}}$~--- штраф за превышение средней температуры чипов над лимитом
+(см.\ \texttt{ga\_core.py}: \texttt{evaluate\_chromosome}).
+
+\vspace{0.5em}
+
+% --- Рис. 1: run_ga ---
+\begin{center}
+\begin{tikzpicture}[
+  font=\footnotesize,
+  >=Stealth,
+  blk/.style={
+    rectangle,
+    draw=black!70,
+    rounded corners=3pt,
+    thick,
+    align=center,
+    inner sep=6pt,
+    minimum width=3.4cm,
+  },
+  dec/.style={
+    diamond,
+    draw=black!70,
+    thick,
+    aspect=2.2,
+    inner sep=2pt,
+    align=center,
+  },
+  smallblk/.style={
+    rectangle,
+    draw=black!55,
+    rounded corners=2pt,
+    align=left,
+    inner sep=5pt,
+    font=\scriptsize,
+  },
+]
+
+  \node[blk, fill=green!12] (start) {\textbf{Начало}\\[0.2em]задать ГПСЧ};
+
+  \node[blk, fill=blue!8, below=0.55cm of start] (init) {%
+    \textbf{Инициализация популяции}\\[0.2em]
+    $N_{\mathrm{pop}}$ случайных хромосом\\[0.1em]
+    {\scriptsize гены: $T^{\mathrm{tgt}}_{\mathrm{chip}}$, $k_p$, $s^{\mathrm{base}}_{\mathrm{fan}}$,
+    $k_{\mathrm{fan}}$, $\Delta sp_{\max}$}};
+
+  \node[blk, fill=yellow!10, below=0.5cm of init] (loop) {%
+    \textbf{Цикл по поколениям}\\[0.15em]
+    $g = 1, 2, \ldots, G$};
+
+  \node[blk, fill=orange!14, below=0.5cm of loop, minimum width=4.2cm] (fitall) {%
+    \textbf{Оценка популяции}\\[0.15em]
+    для каждой хромосомы $i$:\\[0.1em]
+    $f_i \leftarrow F(g_i)$ \quad (прогон API двойника)};
+
+  \node[blk, fill=purple!10, below=0.5cm of fitall] (best) {%
+    \textbf{Лучший в поколении}; обновить\\[0.1em]
+    глобально лучшую хромосому};
+
+  \node[blk, fill=cyan!10, below=0.5cm of best, minimum width=4.8cm] (newpop) {%
+    \textbf{Новое поколение}\\[0.15em]
+    элита: копия лучшего индивида;\\[0.1em]
+    дополнить до $N_{\mathrm{pop}}$:\\[0.15em]
+    турнир $(k{=}3)$ $\rightarrow$ кроссовер $\rightarrow$ мутация};
+
+  \node[blk, fill=gray!18, below=0.55cm of newpop] (end) {%
+    \textbf{Конец}\\[0.15em]
+    вернуть лучшую хромосому за все $G$ поколений};
+
+  \draw[thick,->] (start) -- (init);
+  \draw[thick,->] (init) -- (loop);
+  \draw[thick,->] (loop) -- (fitall);
+  \draw[thick,->] (fitall) -- (best);
+  \draw[thick,->] (best) -- (newpop);
+  \draw[thick,->] (newpop) -- (end);
+
+  % Пояснение справа
+  \node[smallblk, fill=white, right=1.1cm of fitall, anchor=north west, yshift=0.3cm] (note1) {%
+    \textbf{Детализация} $F(g_i)$ --- рис.~2.\\[0.2em]
+    Кроссовер: взвешенное смешивание\\[0.1em]
+    родителей, $\alpha \in [0{,}2,\,0{,}8]$.\\[0.2em]
+    Мутация: гауссов шум по гену\\[0.1em]
+    с вероятностью $0{,}15$ (после клипа в границы).
+  };
+
+\end{tikzpicture}
+\end{center}
+
+\vspace{0.4em}
+
+% --- Рис. 2: evaluate_chromosome ---
+\begin{center}
+\begin{tikzpicture}[
+  font=\footnotesize,
+  >=Stealth,
+  blk/.style={
+    rectangle,
+    draw=black!70,
+    rounded corners=3pt,
+    thick,
+    align=center,
+    inner sep=6pt,
+    minimum width=3.6cm,
+  },
+  dec/.style={
+    diamond,
+    draw=black!70,
+    thick,
+    aspect=2.4,
+    inner sep=1pt,
+    align=center,
+    font=\scriptsize,
+  },
+]
+
+  \node[blk, fill=green!12] (e0) {\textbf{Вход}: хромосома $g$};
+
+  \node[blk, fill=blue!8, below=0.45cm of e0] (e1) {%
+    \textbf{Сценарий на двойнике}\\[0.15em]
+    сброс, режим охлаждения, уставка/вент.,\\[0.1em]
+    нагрузка, $T_{\mathrm{out}}$};
+
+  \node[blk, fill=yellow!10, below=0.45cm of e1] (e2) {%
+    $s \leftarrow 1$; накопители:\\[0.1em]
+    $E_{\mathrm{cool}} \leftarrow 0$, $P_{\mathrm{temp}} \leftarrow 0$};
+
+  \node[blk, fill=orange!12, below=0.45cm of e2, minimum width=4cm] (e3) {%
+    \textbf{Шаг симуляции} ($s$)\\
+    \texttt{/simulation/step}; телеметрия};
+
+  \node[blk, fill=orange!8, below=0.4cm of e3] (e4) {%
+    учёт $E_{\mathrm{cool}} += P_{\mathrm{inf}}\,\Delta t$;\\[0.1em]
+    штраф по $\overline{T_{\mathrm{chip}}}$};
+
+  \node[dec, fill=magenta!6, below=0.45cm of e4] (e5) {шаг кратен\\[0.1em]\texttt{control\_interval}?};
+
+  \node[blk, fill=cyan!12, below left=0.55cm and 0.05cm of e5] (e6) {%
+    P-закон по ошибке\\[0.1em]
+    $e = \overline{T_{\mathrm{chip}}} - T^{\mathrm{tgt}}_{\mathrm{chip}}$:\\[0.1em]
+    $\Delta T_{\mathrm{set}}$, новая уставка;\\[0.1em]
+    $s_{\mathrm{fan}}$ из $g$};
+
+  \node[blk, fill=gray!15, below right=0.55cm and 0.05cm of e5] (e7) {без изменения\\[0.1em]управления};
+
+  \coordinate (join) at ($(e6.south)!0.5!(e7.south)$);
+  \node[dec, below=0.65cm of join] (e8) {%
+    $s < n_{\mathrm{steps}}$?\\[0.15em]
+    {\scriptsize (ещё шаг эпизода?)}};
+
+  \node[blk, fill=purple!12, below=0.65cm of e8] (e9) {%
+    \textbf{Выход}: $F = E_{\mathrm{cool}} + w\,P_{\mathrm{temp}}$};
+
+  \draw[thick,->] (e0) -- (e1);
+  \draw[thick,->] (e1) -- (e2);
+  \draw[thick,->] (e2) -- (e3);
+  \draw[thick,->] (e3) -- (e4);
+  \draw[thick,->] (e4) -- (e5);
+  \draw[thick,->] (e5) -- node[left, font=\scriptsize, pos=0.4] {да} (e6);
+  \draw[thick,->] (e5) -- node[right, font=\scriptsize, pos=0.4] {нет} (e7);
+  \draw[thick,->] (e6) |- (join);
+  \draw[thick,->] (e7) |- (join);
+  \draw[thick,->] (join) -- (e8);
+  % да: ещё есть шаги — снова шаг симуляции (следующий s)
+  \draw[thick,->] (e8.east) -- node[above, font=\scriptsize, near start] {да} ++(1.85,0)
+    |- node[right, font=\scriptsize, pos=0.22] {$s \leftarrow s{+}1$} (e3.east);
+  \draw[thick,->] (e8.south) -- node[right, font=\scriptsize, pos=0.42] {нет} (e9);
+
+\end{tikzpicture}
+\end{center}
+
+\vspace{-0.8em}
+\begin{center}
+\footnotesize
+\textit{Рис.~2.} После обработки шага $s$ проверяется, остались ли шаги эпизода;
+при \textbf{да} выполняется $s \leftarrow s{+}1$ и снова вызывается шаг симуляции.
+\end{center}
+
+\vspace{0.3em}
+
+\noindent\textbf{Соответствие коду.}
+\begin{align*}
+  &\textbf{Гены} \quad g = (T^{\mathrm{tgt}}_{\mathrm{chip}},\, k_p,\, s^{\mathrm{base}}_{\mathrm{fan}},\, k_{\mathrm{fan}},\, \Delta sp_{\max}).
+  \\[0.35em]
+  &\textbf{Приспособленность.} \quad
+  F = \sum_{s=1}^{n_{\mathrm{steps}}} P_{\mathrm{inf}}(s)\,\Delta t
+  + w \sum_{s=1}^{n_{\mathrm{steps}}} \max\bigl(0,\, \overline{T_{\mathrm{chip}}}(s) - T_{\mathrm{lim}}\bigr)\,\Delta t.
+  \\[0.35em]
+  &\textbf{Управление} (на шагах кратных \texttt{control\_interval}):
+  \quad
+  \Delta T_{\mathrm{set}} = -\mathrm{clip}(k_p\, e,\, \pm \Delta sp_{\max}), \quad
+  s_{\mathrm{fan}} = \mathrm{clip}\bigl(s^{\mathrm{base}}_{\mathrm{fan}} + k_{\mathrm{fan}}\max(0,e),\, 0,\,100\bigr).
+\end{align*}
+
+\end{document}
